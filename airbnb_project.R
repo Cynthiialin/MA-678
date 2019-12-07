@@ -1,0 +1,877 @@
+## ----setup, include=FALSE-------------------------------------------------------------------------------------------------------------------------------------
+knitr::opts_chunk$set(echo = TRUE)
+
+
+## ----message=FALSE,warning=FALSE------------------------------------------------------------------------------------------------------------------------------
+library(randomForest)
+library(lmerTest)
+library(car)
+library(ggplot2)
+library(gridExtra)
+library(stats)
+library(lmtest)
+
+
+
+## ----message=FALSE,warning=FALSE------------------------------------------------------------------------------------------------------------------------------
+list=read.csv("listings.csv")
+list<-list[,-c(2,3,4,9,16,17,18,19,20,21,23,28,30,31,33,34,41,43,44,47,48,70,71,72,73,74,75,77,78,79,80,81,82,84,85,86,88,89,90,91,92,93,94,95,96,98,102,103,104,105)]
+
+
+
+## ----message=FALSE,warning=FALSE------------------------------------------------------------------------------------------------------------------------------
+list_sum<-read.csv("listings_sum.csv")
+#review_final<-read.csv("reviews_final.csv")
+# Select 5000 random rows
+#review<-review_final[sample(nrow(review_final), 5000), ]
+#write.csv(review,file="review.csv")
+
+
+
+## ----message=FALSE,warning=FALSE------------------------------------------------------------------------------------------------------------------------------
+review<-read.csv("review.csv")
+
+
+## ----message=FALSE,warning=FALSE------------------------------------------------------------------------------------------------------------------------------
+library(Amelia)
+#Check any NA
+missmap(list,col=c('yellow','black'),y.at=1,y.labels='',legend=TRUE)
+
+
+## ----message=FALSE,warning=FALSE------------------------------------------------------------------------------------------------------------------------------
+
+#drop irrelevant columns
+list<-list[,-c(39,41,42)]
+
+
+## ----message=FALSE,warning=FALSE,fig.width=14,fig.height=6,out.width="90%"------------------------------------------------------------------------------------
+#check proportition of NA in whole dataset
+missmap(list,col=c('yellow','black'),y.at=1,y.labels='',legend=TRUE)
+
+
+## ----message=FALSE,warning=FALSE------------------------------------------------------------------------------------------------------------------------------
+list$host_since<-list_sum$host_since
+list[list==""]<-NA
+#drop missing values completely 
+list<-na.omit(list)
+
+
+## ----message=FALSE,warning=FALSE------------------------------------------------------------------------------------------------------------------------------
+write.csv(list,file="list.csv")
+
+
+## ----message=FALSE,warning=FALSE------------------------------------------------------------------------------------------------------------------------------
+#remove rows that have N/A in "host_response_time","host_response_rate""
+library(dplyr)
+list = filter(list, host_response_time != "N/A" & host_response_rate != "N/A")
+
+
+## ----message=FALSE,warning=FALSE------------------------------------------------------------------------------------------------------------------------------
+#write.csv(list,file="airbnb.csv")
+
+
+## ----message=FALSE,warning=FALSE------------------------------------------------------------------------------------------------------------------------------
+#Display the data dimensions
+dim(list)
+
+
+## ----message=FALSE,warning=FALSE------------------------------------------------------------------------------------------------------------------------------
+# Display the column names
+colnames(list)
+
+
+## ----message=FALSE,warning=FALSE------------------------------------------------------------------------------------------------------------------------------
+# Display the data structures
+str(list)
+
+
+## ----message=FALSE,warning=FALSE------------------------------------------------------------------------------------------------------------------------------
+#review/summaries text analysis
+library(gridExtra)
+library(grid)
+par(mfrow=c(4,4))
+library(plotly)
+library(ggthemes)
+
+g<-ggplot(data = list) +
+  geom_bar(aes(x = bedrooms),fill="#D53E4F") + 
+  xlab('Bedrooms') + 
+  labs(title = "Numbers of bedrooms")+xlim(-1, 10)+
+  theme(plot.title = element_text(hjust = 0.5,size=13),panel.grid.major =element_blank(), panel.grid.minor = element_blank(),
+panel.background = element_blank(),axis.line = element_line(colour = "black"))
+  
+
+h<-ggplot(data = list) +
+  geom_bar(aes(x = beds),fill="#DE77AE") + 
+  xlab('Beds') + 
+  labs(title = "Numbers of beds")+xlim(-1, 10)+
+  theme(plot.title = element_text(hjust = 0.5,size=13),panel.grid.major =element_blank(), panel.grid.minor = element_blank(),
+panel.background = element_blank(),axis.line = element_line(colour = "black"))
+  
+j<-ggplot(data = list) +
+  geom_bar(aes(x = accommodates),fill="#3288BD") + 
+  xlab('Accommodates') + 
+  labs(title = "Numbers of accommodates")+xlim(0, 10)+
+  theme(plot.title = element_text(hjust = 0.5,size=13),panel.grid.major =element_blank(), panel.grid.minor = element_blank(),
+panel.background = element_blank(),axis.line = element_line(colour = "black"))
+
+i<-ggplot(data = list) +
+  geom_bar(aes(x = bathrooms),fill="#FB8072") + 
+  xlab('Bathrooms') + 
+  labs(title = "Numbers of bathrooms")+xlim(0, 7)+
+  theme(plot.title = element_text(hjust = 0.5,size=13),panel.grid.major =element_blank(), panel.grid.minor = element_blank(),
+panel.background = element_blank(),axis.line = element_line(colour = "black"))
+
+
+
+grid.arrange(g, h, j,i ,ncol=2)
+
+
+## ----message=FALSE,warning=FALSE------------------------------------------------------------------------------------------------------------------------------
+
+#price analysis
+ggplot(data = list) +
+  geom_bar(aes(x = price),fill="#FB8072") + 
+  xlab('Price') + 
+  labs(title = "Price")+xlim(-1, 500)+
+  theme(plot.title = element_text(hjust = 0.5,size=13),panel.grid.major =element_blank(), panel.grid.minor = element_blank(),
+panel.background = element_blank(),axis.line = element_line(colour = "black"))
+
+
+## ----message=FALSE,warning=FALSE------------------------------------------------------------------------------------------------------------------------------
+
+#neighborhood analysis
+library(dplyr)
+library(kableExtra)
+list1<-list%>%group_by(list$neighbourhood) %>% summarise(number = n())%>%arrange(desc(number))
+head(list1)
+
+
+
+## ----message=FALSE,warning=FALSE------------------------------------------------------------------------------------------------------------------------------
+Latitude<-list[,28]
+Latitude<-data.frame(Latitude)
+Latitude$long<-list[,29]
+
+
+## ----message=FALSE,warning=FALSE------------------------------------------------------------------------------------------------------------------------------
+Latitude_sample<-Latitude[sample(nrow(Latitude), 100), ]
+
+
+## ----message=FALSE,warning=FALSE------------------------------------------------------------------------------------------------------------------------------
+# get the location of housing
+#library(leaflet)
+#Latitude_sample %>%
+  #leaflet() %>%
+ # addTiles() %>%
+ # addTiles() %>%
+#addMarkers(popup="sites")
+
+
+
+## ----message=FALSE,warning=FALSE------------------------------------------------------------------------------------------------------------------------------
+#property type analysis
+
+list$property_type = as.factor(list$property_type)
+ggplot(aes(x = property_type, y = bathrooms,color=property_type,fill=property_type), data = list) +
+  geom_boxplot() +
+  geom_jitter(alpha = 0.1)+
+  coord_cartesian(ylim=c(0,15))+
+theme( axis.text.x  = element_text(angle=90, hjust=1, vjust=0.9))+
+ scale_fill_viridis_d(option = "viridis") +
+ scale_color_viridis_d(option = "viridis") +
+ theme_pander() 
+
+
+
+## ----message=FALSE,warning=FALSE------------------------------------------------------------------------------------------------------------------------------
+
+#room type analysis
+par(mfrow=c(4,4))
+list$room_typee = as.factor(list$room_type)
+ggplot(aes(x = room_type, y = bathrooms,color=room_type,fill=room_type), data = list) +
+  geom_boxplot() +
+  geom_jitter(alpha = 0.1)+
+  coord_cartesian(ylim=c(0,15))+
+theme( axis.text.x  = element_text(angle=35, hjust=1, vjust=0.9))+
+ xlab('Bathrooms') + 
+  labs(title = "Numbers of bathrooms")+
+  scale_fill_viridis_d(option = "viridis") +
+ scale_color_viridis_d(option = "viridis") +
+ theme_pander() 
+
+ggplot(aes(x = room_type, y = accommodates,color=room_type,fill=room_type), data = list) +
+  geom_boxplot() +
+  geom_jitter(alpha = 0.1)+
+  coord_cartesian(ylim=c(0,15))+
+theme( axis.text.x  = element_text(angle=35, hjust=1, vjust=0.9))+
+ xlab('Bathrooms') + 
+  labs(title = "Numbers of accommodates")+
+  scale_fill_viridis_d(option = "viridis") +
+ scale_color_viridis_d(option = "viridis") +
+ theme_pander() 
+
+ggplot(aes(x = room_type, y = beds,color=room_type,fill=room_type), data = list) +
+  geom_boxplot() +
+  geom_jitter(alpha = 0.1)+
+  coord_cartesian(ylim=c(0,15))+
+theme( axis.text.x  = element_text(angle=35, hjust=1, vjust=0.9))+
+ xlab('Beds') + 
+  labs(title = "Numbers of beds")+
+  scale_fill_viridis_d(option = "viridis") +
+ scale_color_viridis_d(option = "viridis") +
+ theme_pander() 
+
+ggplot(aes(x = room_type, y = bedrooms,color=room_type,fill=room_type), data = list) +
+  geom_boxplot() +
+  geom_jitter(alpha = 0.1)+
+  coord_cartesian(ylim=c(0,15))+
+theme( axis.text.x  = element_text(angle=35, hjust=1, vjust=0.9))+
+ xlab('Bedrooms') + 
+  labs(title = "Numbers of bedrooms")+
+  scale_fill_viridis_d(option = "viridis") +
+ scale_color_viridis_d(option = "viridis") +
+ theme_pander() 
+
+ggplot(aes(x = room_type, y = security_deposit,color=room_type,fill=room_type), data = list) +
+  geom_boxplot() +
+  geom_jitter(alpha = 0.1)+
+  coord_cartesian(ylim=c(0,1500))+
+theme( axis.text.x  = element_text(angle=35, hjust=1, vjust=0.9))+
+ xlab('Security Deposit') + 
+  labs(title = "Numbers of security_deposit")+
+  scale_fill_viridis_d(option = "viridis") +
+ scale_color_viridis_d(option = "viridis") +
+ theme_pander() 
+
+ggplot(aes(x = room_type, y = cleaning_fee,color=room_type,fill=room_type), data = list) +
+  geom_boxplot() +
+  geom_jitter(alpha = 0.1)+
+  coord_cartesian(ylim=c(0,200))+
+theme( axis.text.x  = element_text(angle=35, hjust=1, vjust=0.9))+
+ xlab('Cleaning Fee') + 
+  labs(title = "Cleaning Fee")+
+  scale_fill_viridis_d(option = "viridis") +
+ scale_color_viridis_d(option = "viridis") +
+ theme_pander() 
+
+
+## ----message=FALSE,warning=FALSE------------------------------------------------------------------------------------------------------------------------------
+#number of booking records based on room type
+m<-ggplot(aes(x = price,fill=room_type,color=room_type), data = list) +
+  geom_histogram()+
+  facet_wrap(~room_type)+xlim(0, 500)+
+  theme( axis.text.x  = element_text(angle=35, hjust=1, vjust=0.9))+
+ labs(x = "Price", y = " Count") +
+  ggtitle("Number of Booking Records among each Room Type")+
+  scale_fill_viridis_d(option = "viridis") +
+ scale_color_viridis_d(option = "viridis") +
+ theme_pander() 
+m
+
+
+## ----message=FALSE,warning=FALSE------------------------------------------------------------------------------------------------------------------------------
+#room type numbers in each category
+library(dplyr)
+list_roomtype<-list%>%group_by(list$room_type) %>% summarise(number = n())%>%arrange(desc(number))
+library(knitr)
+kable(list_roomtype,format = "markdown")
+
+
+## ----message=FALSE,warning=FALSE------------------------------------------------------------------------------------------------------------------------------
+library("RColorBrewer")
+#pie chart
+# Pie Chart with Percentages 
+slices <- c(28468, 14410, 1769, 406)
+lbls <- c("Entire home/Apt", "Private Room", "Shared Room", "Hotel Room")
+pct <- round(slices/sum(slices)*100)
+lbls <- paste(lbls, pct) # add percents to labels
+lbls <- paste(lbls,"%",sep="") # ad % to labels
+coul <- brewer.pal(5, "BuPu") 
+pie(slices,labels = lbls, col=coul,
+   main="Pie Chart of Room Type")
+
+
+## ----message=FALSE,warning=FALSE------------------------------------------------------------------------------------------------------------------------------
+
+library(tidyverse)
+library(tidytext)
+library(knitr)
+library(textdata)
+library(magrittr)
+
+summary<-data.frame(list$summary)
+summary$list.summary<-as.character(summary$list.summary)
+tidy_word <- summary %>%
+  unnest_tokens(word,list.summary)
+
+
+## ----message=FALSE,warning=FALSE------------------------------------------------------------------------------------------------------------------------------
+#find the most frequently used words in summary
+library(wordcloud)
+library(magrittr)
+tidy_word %>%
+  anti_join(stop_words) %>%
+  count(word) %>%
+  with(wordcloud(word, n, max.words = 20,colors = brewer.pal(7, 'Dark2'), random.order = FALSE,rot.per=0.75))
+
+
+## ----message=FALSE,warning=FALSE------------------------------------------------------------------------------------------------------------------------------
+review<-na.omit(review)
+
+
+## ----message=FALSE,warning=FALSE------------------------------------------------------------------------------------------------------------------------------
+comment<-data.frame(review$comments)
+comment$review.comments<-as.character(comment$review.comments)
+tidy_word_com <- comment %>%
+  unnest_tokens(word,review.comments)
+
+
+## ----message=FALSE,warning=FALSE------------------------------------------------------------------------------------------------------------------------------
+tidy_word_com %>%
+  anti_join(stop_words) %>%
+  count(word) %>%
+  with(wordcloud(word, n, max.words = 100,colors = brewer.pal(7, 'Dark2'), random.order = FALSE,rot.per=0.35))
+
+
+## ----message=FALSE,warning=FALSE------------------------------------------------------------------------------------------------------------------------------
+#get relevant columns in the dataset for regression
+model_data<-list[,c(33:36,39:45,47,48)]
+head(model_data)
+
+
+## ----message=FALSE,warning=FALSE------------------------------------------------------------------------------------------------------------------------------
+#Find the corrleation among each variable
+set.seed(200)
+library(GGally)
+ggpairs(model_data,cardinality_threshold = 100) +
+  theme(text = element_text(size = 8)) +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1, size = 4))
+
+
+## ----message=FALSE,warning=FALSE------------------------------------------------------------------------------------------------------------------------------
+#correlation plot
+pairs(model_data)
+
+
+## ----message=FALSE,warning=FALSE------------------------------------------------------------------------------------------------------------------------------
+#Correlogram
+library(corrgram)
+library(PerformanceAnalytics)
+corMat <- cor(model_data, use = "complete")
+round(corMat, 3)
+library(corrplot)
+corrplot(cor(model_data), method = "circle")
+
+
+
+
+## -------------------------------------------------------------------------------------------------------------------------------------------------------------
+#multiple regression 
+linear<-lm(price~extra_people+maximum_nights+number_of_reviews+review_scores_rating+guests_included,data=model_data)
+summary(linear)
+
+
+## -------------------------------------------------------------------------------------------------------------------------------------------------------------
+#calculate AIC
+AIC(linear)
+
+
+## -------------------------------------------------------------------------------------------------------------------------------------------------------------
+plot(residuals(linear))
+
+
+## -------------------------------------------------------------------------------------------------------------------------------------------------------------
+#residual plot
+hist(linear$residuals)
+
+
+## -------------------------------------------------------------------------------------------------------------------------------------------------------------
+#calcualte VIF
+vif(linear)
+
+
+## -------------------------------------------------------------------------------------------------------------------------------------------------------------
+#drop some observations(might be outlier)
+model_data<-model_data[-c(5519,6209),]
+adj.linear<-lm(price~extra_people+maximum_nights+number_of_reviews+review_scores_rating+guests_included,data=model_data)
+summary(adj.linear)
+
+
+## -------------------------------------------------------------------------------------------------------------------------------------------------------------
+#model check( adjusted model)
+plot(adj.linear)
+
+
+## -------------------------------------------------------------------------------------------------------------------------------------------------------------
+#model check(old model)
+plot(linear)
+
+
+## -------------------------------------------------------------------------------------------------------------------------------------------------------------
+# F-statistic
+summary(linear)$fstatistic
+# confidence interval
+confint(linear)
+# visualize the confidence intervals
+library(coefplot)
+coefplot(linear, intercept = FALSE)
+
+
+## -------------------------------------------------------------------------------------------------------------------------------------------------------------
+dwt(linear)
+
+
+## ----message=FALSE,warning=FALSE------------------------------------------------------------------------------------------------------------------------------
+#make a scatter plot
+ggplot(list)+aes(x=accommodates,y=price)+
+  geom_point()+geom_smooth(method="lm",se=FALSE)
+
+
+## ----message=FALSE,warning=FALSE------------------------------------------------------------------------------------------------------------------------------
+model2<-lm(price~accommodates+bathrooms+bedrooms+beds+cleaning_fee+security_deposit,data=list)
+summary(model2)
+
+
+## ----message=FALSE,warning=FALSE------------------------------------------------------------------------------------------------------------------------------
+AIC(model2)
+
+
+## ----message=FALSE,warning=FALSE------------------------------------------------------------------------------------------------------------------------------
+model1<-lm(price~accommodates+bathrooms+bedrooms+beds+cleaning_fee+guests_included,data=list)
+summary(model1)
+
+
+## ----message=FALSE,warning=FALSE------------------------------------------------------------------------------------------------------------------------------
+hist(model1$residuals)
+
+
+## ----message=FALSE,warning=FALSE------------------------------------------------------------------------------------------------------------------------------
+qqnorm(model1$residuals)
+qqline(model1$residuals)
+
+
+## ----message=FALSE,warning=FALSE------------------------------------------------------------------------------------------------------------------------------
+library(coefplot)
+coefplot(model1)
+
+
+## ----message=FALSE,warning=FALSE------------------------------------------------------------------------------------------------------------------------------
+plot(fitted(model1),model1$residuals)
+abline(0,0,col="red")
+
+
+## ----message=FALSE,warning=FALSE------------------------------------------------------------------------------------------------------------------------------
+library(tidyverse) 
+library(gridExtra) 
+library(car)
+#Checking the assumption of independence
+dwt(model1)
+
+
+## ----message=FALSE,warning=FALSE------------------------------------------------------------------------------------------------------------------------------
+# VIF
+vif(model1)
+
+
+## ----message=FALSE,warning=FALSE------------------------------------------------------------------------------------------------------------------------------
+# tolerance
+1/vif(model1)
+# mean VIF
+mean(vif(model1))
+
+
+
+## ----message=FALSE,warning=FALSE------------------------------------------------------------------------------------------------------------------------------
+plot(model1)
+
+
+## ----message=FALSE,warning=FALSE------------------------------------------------------------------------------------------------------------------------------
+# F-statistic
+summary(model1)$fstatistic
+# confidence interval
+confint(model1)
+# visualize the confidence intervals
+library(coefplot)
+coefplot(model1, intercept = FALSE)
+
+
+## ----message=FALSE,warning=FALSE------------------------------------------------------------------------------------------------------------------------------
+library(MASS)
+#Shapiro-Wilk Normality Test
+## Distribution of studentized residuals
+student_residuals <- studres(model1)
+shapiro.test(sample(student_residuals, size = 5000))
+#p-value is less than 0.05, reject the null hypothesis that residuals are normally distributed.
+
+
+## ----message=FALSE,warning=FALSE------------------------------------------------------------------------------------------------------------------------------
+#change price into binary outcome
+library(magrittr)
+library(tidyverse)
+log_list<-list
+log_list$price<-as.factor(ifelse(log_list$price>400,1,0))
+
+
+## ----message=FALSE,warning=FALSE------------------------------------------------------------------------------------------------------------------------------
+#get confusion matrix
+(table(log_list$price))
+6759/(6759+421)
+
+
+## ----message=FALSE,warning=FALSE------------------------------------------------------------------------------------------------------------------------------
+library(caTools)
+#Splitting Training & Testing Data
+# Randomly split data
+set.seed(6888)
+split = sample.split(log_list$price, SplitRatio = 0.94)
+# Create training and testing sets
+priceTrain = subset(log_list, split == TRUE)
+priceTrain<-data.frame(priceTrain)
+priceTest = subset(log_list, split == FALSE)
+priceTest<-data.frame(priceTest)
+
+
+## ----message=FALSE,warning=FALSE------------------------------------------------------------------------------------------------------------------------------
+nrow(priceTrain)
+nrow(priceTest)
+
+
+## ----message=FALSE,warning=FALSE------------------------------------------------------------------------------------------------------------------------------
+#logistic regression
+logistic.model1=glm(price~accommodates+bathrooms+bedrooms+beds+cleaning_fee+security_deposit,data=priceTrain , family=binomial )
+summary(logistic.model1)
+
+
+## ----message=FALSE,warning=FALSE------------------------------------------------------------------------------------------------------------------------------
+#model check
+library(car)
+marginalModelPlots(logistic.model1)
+
+
+## ----message=FALSE,warning=FALSE------------------------------------------------------------------------------------------------------------------------------
+#binned residual plot
+library(arm)
+binnedplot(fitted(logistic.model1),residuals(logistic.model1,type="response"))
+
+
+## ----message=FALSE,warning=FALSE------------------------------------------------------------------------------------------------------------------------------
+#use model to get prediction
+predictTrain = predict(logistic.model1, type="response")
+summary(predictTrain)
+
+
+## ----message=FALSE,warning=FALSE------------------------------------------------------------------------------------------------------------------------------
+tapply(predictTrain, priceTrain$price, mean)
+
+
+## ----message=FALSE,warning=FALSE------------------------------------------------------------------------------------------------------------------------------
+#Confusion matrix for threshold of 0.5
+table(priceTrain$price, predictTrain > 0.5)
+
+
+## ----message=FALSE,warning=FALSE------------------------------------------------------------------------------------------------------------------------------
+#sensitivity
+82/(339+82)
+
+
+## ----message=FALSE,warning=FALSE------------------------------------------------------------------------------------------------------------------------------
+#Iload ROCR package
+library(ROCR)
+ROCRpred = prediction(predictTrain, priceTrain$price)
+# Performance function
+ROCRperf = performance(ROCRpred, "tpr", "fpr")
+# Add threshold labels 
+plot(ROCRperf, colorize=TRUE, print.cutoffs.at=seq(0,1,by=0.1), text.adj=c(-0.2,1.7))
+
+
+
+## ----message=FALSE,warning=FALSE------------------------------------------------------------------------------------------------------------------------------
+predictTest = predict(logistic.model1, type = "response", newdata = priceTest)
+table(priceTest$price,predictTest >= 0.3)
+# Accuracy
+(400+9)/(409+22)
+
+
+
+## ----message=FALSE,warning=FALSE------------------------------------------------------------------------------------------------------------------------------
+#multi-level regression
+data<-read.csv("list.csv")
+neigh<-data$neighbourhood
+data<-data[,c(40:55)]
+#data$neigh<-neigh
+data$host_since<-NULL
+data$calendar_updated<-NULL
+data$cancellation_policy<-as.factor(data$cancellation_policy)
+data$require_guest_phone_verification<-as.factor(data$require_guest_phone_verification)
+data$require_guest_profile_picture<-as.factor(data$require_guest_profile_picture)
+index<-sample(7180,7180/2,replace = F)
+variable<-data[index,]
+modelset<-data[-index,]
+# function for leave-one-out cv
+looCv<- function(model){
+mean(residuals(model)^2/(1-hatvalues(model))^2)
+}
+
+
+
+## ----message=FALSE,warning=FALSE------------------------------------------------------------------------------------------------------------------------------
+# random forest
+mod1<-randomForest(price~.,data = variable,importance=T,ntree=500)
+mod2<-randomForest(price~.,data = variable,importance=T,ntree=1000)
+
+varImpPlot(mod1)
+varImpPlot(mod2)
+# select top 6 
+finaldata<-data[,c(1,2,3,4,5)]
+finaldata$neigh<-neigh
+finaldata$cancelPolicy<-data$cancellation_policy
+finaldata$instant_bookable<-data$instant_bookable
+
+
+
+## ----message=FALSE,warning=FALSE------------------------------------------------------------------------------------------------------------------------------
+#find relationship between price and each variable
+p1<-ggplot(finaldata, aes(x=security_deposit, y=price)) +
+  geom_smooth()
+p2<-ggplot(finaldata, aes(x=cleaning_fee, y=price)) +
+  geom_smooth()
+p3<-ggplot(finaldata, aes(x=guests_included, y=price)) +
+  geom_smooth()
+p4<-ggplot(finaldata, aes(x=extra_people, y=price)) +
+  geom_smooth()
+grid.arrange(p1,p2,p3,p4,nrow=2)
+
+
+
+## ----message=FALSE,warning=FALSE------------------------------------------------------------------------------------------------------------------------------
+# random intercept
+finaldata<-na.omit(finaldata)
+mod1<-lmer(price^0.1~security_deposit+cleaning_fee+guests_included+(-extra_people^2)+cancelPolicy+instant_bookable+(1|neigh),data = finaldata)
+# normality of residual
+qqnorm(residuals(mod1))
+qqline(residuals(mod1))
+
+
+## ----message=FALSE,warning=FALSE------------------------------------------------------------------------------------------------------------------------------
+summary(mod1)
+
+
+## -------------------------------------------------------------------------------------------------------------------------------------------------------------
+#head(coef(mod1))
+
+
+## ----message=FALSE,warning=FALSE------------------------------------------------------------------------------------------------------------------------------
+library(arm)
+display(mod1)
+
+
+## ----message=FALSE,warning=FALSE------------------------------------------------------------------------------------------------------------------------------
+# normality of parameters
+para<-data.frame(ranef(mod1))
+
+
+## ----message=FALSE,warning=FALSE------------------------------------------------------------------------------------------------------------------------------
+qqnorm(para[,4])
+qqline(para[,4])
+# independentce of residual 
+plot(residuals(mod1))
+# constant variable
+plot(residuals(mod1))
+# check multicollinearity
+vif(mod1)
+
+
+
+## -------------------------------------------------------------------------------------------------------------------------------------------------------------
+#calculate MSR after cross validation for model 1
+mse1<-looCv(mod1)
+mse1
+
+
+
+## ----message=FALSE,warning=FALSE------------------------------------------------------------------------------------------------------------------------------
+# random slope
+mod2<-lmer(price^0.1~security_deposit+cleaning_fee+guests_included+cancelPolicy+instant_bookable+(0+cleaning_fee|neigh),data = finaldata)
+# normality of residual
+qqnorm(residuals(mod2))
+qqline(residuals(mod2))
+# normality of parameters
+para<-data.frame(ranef(mod2))
+qqnorm(para[,4])
+qqline(para[,4])
+# independentce of residual 
+plot(residuals(mod2))
+# constant variance
+plot(residuals(mod2))
+# check multicollinearity
+vif(mod2)
+
+
+## -------------------------------------------------------------------------------------------------------------------------------------------------------------
+summary(mod2)
+
+
+## -------------------------------------------------------------------------------------------------------------------------------------------------------------
+#coef(mod2)
+
+
+## ----message=FALSE,warning=FALSE------------------------------------------------------------------------------------------------------------------------------
+display(mod2)
+
+
+## -------------------------------------------------------------------------------------------------------------------------------------------------------------
+#calculate MSR after cross validation for model 2
+mse2<-looCv(mod2)
+mse2
+
+
+
+## ----message=FALSE,warning=FALSE------------------------------------------------------------------------------------------------------------------------------
+# random intercept and slope
+mod3<-lmer(price^0.1~security_deposit+cleaning_fee+guests_included+extra_people+cancelPolicy+instant_bookable+(1+security_deposit+cleaning_fee|neigh),data = finaldata)
+# normality of residual
+qqnorm(residuals(mod3))
+qqline(residuals(mod3))
+
+# normality of parameters
+para<-data.frame(ranef(mod3))
+qqnorm(para[,4])
+qqline(para[,4])
+# independentce of residual 
+plot(residuals(mod3))
+# constant variable
+plot(residuals(mod3))
+# check multicollinearity
+vif(mod3)
+
+
+## ----message=FALSE,warning=FALSE------------------------------------------------------------------------------------------------------------------------------
+#graph relationship between price and each variable grouped by different category of instant_bookable
+p1<-ggplot(finaldata, aes(x=security_deposit, y=price,color=instant_bookable)) +
+geom_smooth()
+p2<-ggplot(finaldata, aes(x=cleaning_fee, y=price,color=instant_bookable)) +
+  geom_smooth()
+p3<-ggplot(finaldata, aes(x=guests_included, y=price,color=instant_bookable)) +
+  geom_smooth()
+p4<-ggplot(finaldata, aes(x=extra_people, y=price,color=instant_bookable)) +
+  geom_smooth()
+grid.arrange(p1,p2,p3,p4,nrow=2)
+
+
+## -------------------------------------------------------------------------------------------------------------------------------------------------------------
+#calculate MSR after cross validation for model 3
+mse3<-looCv(mod3)
+mse3
+
+
+
+
+## -------------------------------------------------------------------------------------------------------------------------------------------------------------
+compare <- cbind(mse1,mse2,mse3)%>%as.data.frame()
+knitr::kable(compare)%>%kableExtra::kable_styling(bootstrap_options = c("striped", "hover"))
+
+
+## ----message=FALSE,warning=FALSE------------------------------------------------------------------------------------------------------------------------------
+# random intercept
+finaldata<-na.omit(finaldata)
+mod4<-lmer(price^0.1~security_deposit+cleaning_fee+guests_included+(-extra_people^2)+cancelPolicy+(1|instant_bookable),data = finaldata)
+
+
+## ----message=FALSE,warning=FALSE------------------------------------------------------------------------------------------------------------------------------
+display(mod4)
+
+
+## ----message=FALSE,warning=FALSE------------------------------------------------------------------------------------------------------------------------------
+# normality of residual
+qqnorm(residuals(mod4))
+qqline(residuals(mod4))
+
+
+## ----message=FALSE,warning=FALSE------------------------------------------------------------------------------------------------------------------------------
+
+
+# normality of parameters
+para<-data.frame(ranef(mod4))
+qqnorm(para[,4])
+qqline(para[,4])
+# independentce of residual 
+plot(residuals(mod4))
+
+# constant variable
+
+plot(residuals(mod4))
+
+# check multicollinearity
+vif(mod4)
+
+
+
+## -------------------------------------------------------------------------------------------------------------------------------------------------------------
+mse4<-looCv(mod4)
+mse4
+
+
+
+
+## ----message=FALSE,warning=FALSE------------------------------------------------------------------------------------------------------------------------------
+# random slope
+glmerControl(optimizer="bobyqa", optCtrl = list(maxfun = 10000000))
+mod5<-lmer(price~security_deposit+cleaning_fee+guests_included+cancelPolicy+(0+security_deposit+cleaning_fee+guests_included|instant_bookable),data = finaldata)
+# normality of residual
+qqnorm(residuals(mod5))
+qqline(residuals(mod5))
+
+# normality of parameters
+para<-data.frame(ranef(mod5))
+qqnorm(para[,4])
+qqline(para[,4])
+# independentce of residual 
+plot(residuals(mod5))
+
+# constant variance
+
+plot(residuals(mod5))
+
+# check multicollinearity
+vif(mod5)
+
+
+## -------------------------------------------------------------------------------------------------------------------------------------------------------------
+mse5<-looCv(mod5)
+mse5
+
+
+
+
+## ----message=FALSE,warning=FALSE------------------------------------------------------------------------------------------------------------------------------
+# random intercept and slope
+mod6<-lmer(price^0.1~security_deposit+cleaning_fee+guests_included+cancelPolicy+(1+security_deposit+cleaning_fee+guests_included|instant_bookable),data = finaldata)
+# normality of residual
+qqnorm(residuals(mod6))
+qqline(residuals(mod6))
+
+# normality of parameters
+para<-data.frame(ranef(mod6))
+qqnorm(para[,4])
+qqline(para[,4])
+# independentce of residual 
+plot(residuals(mod6))
+
+# constant variable
+
+plot(residuals(mod6))
+
+# check multicollinearity
+vif(mod6)
+
+
+## -------------------------------------------------------------------------------------------------------------------------------------------------------------
+mse6<-looCv(mod6)
+mse6
+
+
+## -------------------------------------------------------------------------------------------------------------------------------------------------------------
+compare_new <- cbind(mse4,mse5,mse6)%>%as.data.frame()
+knitr::kable(compare_new)%>%kableExtra::kable_styling(bootstrap_options = c("striped", "hover"))
+
